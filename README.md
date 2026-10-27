@@ -25,7 +25,7 @@ Personal finance tracker built on bank CSV exports. Understand your spending to 
 ## Getting started
 
 ```bash
-git clone https://github.com/Yegor-M/SpendWisely.git
+git clone https://github.com/yehomak/SpendWisely.git
 cd SpendWisely
 cp v2/backend/.env.example v2/backend/.env
 docker compose up --build
