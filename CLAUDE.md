@@ -3,7 +3,7 @@
 ## Stack
 - **Backend** — Python 3.11, FastAPI, DuckDB (single-file), Pydantic v2
 - **Frontend** — Next.js 16, TypeScript, Tailwind, shadcn/ui, Recharts
-- **AI** — Universal LLM provider (Claude/OpenAI/Gemini) for batch transaction categorisation; defaults to `gemini-2.0-flash` (free tier)
+- **AI** — Universal LLM provider (Groq/Claude/OpenAI/Gemini) for batch transaction categorisation; defaults to Groq `llama-3.3-70b-versatile` (free tier)
 - **Data** — Pekao bank CSV (semicolon-delimited, Polish locale, utf-8-sig); Millennium Bank XLSX (auto-detected)
 
 ## Key commands
@@ -69,7 +69,7 @@ data/                   Gitignored — personal bank CSV exports
 - Docker SSR: server components use `API_URL=http://backend:8000/api/v1` (Docker service name); `NEXT_PUBLIC_API_URL` is for browser-side only. Both must be set in compose env.
 - DuckDB global connection is not thread-safe — `routers/insights.py` uses `threading.Lock` to serialize `_load_df()` calls. Do not remove this lock; concurrent reads from FastAPI's thread pool will deadlock.
 - After CSV import `UploadCsv` calls `router.refresh()` to re-run server components — no full page reload needed.
-- `POST /categories/suggest` uses the configured LLM provider (default: `gemini-2.0-flash`). Accepts `[{id, counterparty, title, abs_amount}]`, returns `{id: category}`.
+- `POST /categories/suggest` uses the configured LLM provider (default: Groq). Accepts `[{id, counterparty, title, abs_amount}]`, returns `{id: category}`.
 - `POST /transactions/bulk-categorize` applies categories to specific `tx_ids`, optionally saves a regex rule derived from counterparty (`re.escape(cp.lower())`), and retroactively updates all other uncategorized rows matching the same counterparty via `LOWER(counterparty) LIKE '%cp%'`.
 - Auto-generated rules use `priority=5` and comment `"auto:{counterparty}"` so they are distinguishable from hand-crafted rules.
 - Commitment classification (plan page): `FIXED_CATS` always→fixed; `ALWAYS_HABIT_CATS` (Groceries, Transport, Coffee, Personal Care) always→habit regardless of recurring detection; `RECURRING_HABIT_CATS` (Food & Dining, Shopping, etc.) only→habit if recurring; everything else non-recurring→other.
@@ -117,7 +117,7 @@ category_rules: id, category, pattern, fields[], priority, comment
 - [ ] Phase 3: Apple Wallet export parsing endpoint
 - [ ] Phase 3: Manual cash entry UI (quick-add modal)
 - [ ] Category edit inline on transactions page
-- [ ] Fix dead code: `regularityColor` in RecurringCostsCard, unused `MonthlyBreakdownTable` component, `barColor.replace()` string hack in CategoryDeltasTable
+- [ ] Fix dead code: `regularityColor` in RecurringCostsCard, `barColor.replace()` string hack in CategoryDeltasTable
 - [ ] Gmail PAYPRO verification tool — `GET /gmail/lookup-paypro?date=&amount=` endpoint + "Verify via Gmail" button on PAYPRO rows in ImportReview modal; searches `from:przelewy24.pl` by date window + amount, returns real merchant for approve/categorize flow
 
 ## Do not touch without asking

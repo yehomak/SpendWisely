@@ -18,7 +18,7 @@ services:
     environment:
       DB_PATH: /data/spendwisely.duckdb
     env_file:
-      - ./v2/backend/.env          # ANTHROPIC_API_KEY, OWNER_NAME
+      - ./v2/backend/.env          # LLM keys, OWNER_NAME (see .env.example)
 
   frontend:
     build:
