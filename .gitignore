@@ -45,3 +45,6 @@ v2/frontend/node_modules/
 # Personal notes and sensitive context (tax info, financial details, etc.)
 notes/
 context/private/
+
+# Claude Code agent worktrees
+.claude/worktrees/

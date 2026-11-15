@@ -69,16 +69,6 @@ export type Prediction = {
   history: { month: string; amount: number }[];
 };
 
-export type DowPattern = {
-  day: string; total: number; count: number; avg: number;
-};
-
-export type Anomaly = {
-  booking_date: string; counterparty: string; title: string;
-  abs_amount: number; category: string;
-  z_score: number | null; anomaly_type: string;
-};
-
 export type SpendVelocity = {
   current_month: string; has_current_data: boolean;
   spent_so_far: number; projected_eom: number;
@@ -91,24 +81,6 @@ export type CategoryDelta = {
   last_month: number; prev_month: number;
   delta: number; delta_pct: number | null;
   last_month_label: string; prev_month_label: string;
-};
-
-export type IncomeSource = {
-  counterparty: string; total_received: number;
-  tx_count: number; share_pct: number; avg_per_tx: number;
-  currency: string;
-};
-
-export type BusinessSplit = {
-  total_expenses: number; business_expenses: number; personal_expenses: number;
-  business_pct: number; personal_pct: number;
-  avg_monthly_business: number; avg_monthly_personal: number;
-  business_categories: string[];
-};
-
-export type CategoryTrend = {
-  category: string; months: string[]; values: number[];
-  avg: number; trend: "up" | "down" | "flat";
 };
 
 export type NewMerchant = {
@@ -263,13 +235,8 @@ export const api = {
   merchants:       (n = 10, months?: number) => get<Merchant[]>("/insights/merchants", { n, ...(months ? { months } : {}) }),
   recurring:       (months?: number) => get<Recurring[]>("/insights/recurring", months ? { months } : undefined),
   predict:         (months?: number) => get<Prediction[]>("/insights/predict", months ? { months } : undefined),
-  dow:             (months?: number) => get<DowPattern[]>("/insights/dow", months ? { months } : undefined),
-  anomalies:       (months?: number) => get<Anomaly[]>("/insights/anomalies", months ? { months } : undefined),
   velocity:        ()                => get<SpendVelocity>("/insights/velocity"),
   deltas:          ()                => get<CategoryDelta[]>("/insights/deltas"),
-  incomeSources:   (months?: number) => get<IncomeSource[]>("/insights/income-sources", months ? { months } : undefined),
-  businessSplit:   (months?: number) => get<BusinessSplit>("/insights/business-split", months ? { months } : undefined),
-  categoryTrends:  (months?: number) => get<CategoryTrend[]>("/insights/category-trends", months ? { months } : undefined),
   topTransactions: (n = 10, months?: number) => get<TopTransaction[]>("/insights/top-transactions", { n, ...(months ? { months } : {}) }),
   newMerchants:    ()                => get<NewMerchant[]>("/insights/new-merchants"),
   recurringSummary:(months?: number) => get<RecurringSummary>("/insights/recurring-summary", months ? { months } : undefined),

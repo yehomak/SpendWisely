@@ -12,7 +12,7 @@ pip install -r requirements.txt
 if [ ! -f .env ]; then
   cp .env.example .env
   echo ""
-  echo "Created v2/backend/.env — open it and set ANTHROPIC_API_KEY before importing data."
+  echo "Created v2/backend/.env — optionally set LLM_PROVIDER + API key for AI categorisation."
   echo ""
 fi
 
