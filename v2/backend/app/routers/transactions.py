@@ -1,7 +1,9 @@
 import re
 from typing import Optional
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Header
 from app.database import db
+from app.routers.otp import store as otp_store
+from app.services.otp import OtpError
 from app.models import Transaction, TransactionPatch, ManualTransaction, BulkCategorizeItem, BulkCategorizeResult
 import hashlib, datetime
 
@@ -188,7 +190,14 @@ def bulk_categorize(items: list[BulkCategorizeItem]):
 
 
 @router.delete("", status_code=200)
-def delete_all_transactions():
+def delete_all_transactions(
+    x_confirmation_token: Optional[str] = Header(default=None),
+):
+    """Requires a single-use token from POST /otp/verify (purpose=delete_all_transactions)."""
+    try:
+        otp_store.consume_token(x_confirmation_token, "delete_all_transactions")
+    except OtpError as e:
+        raise HTTPException(e.status, e.message)
     with db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
         conn.execute("DELETE FROM transactions")

@@ -210,13 +210,44 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-async function del<T>(path: string): Promise<T> {
+async function del<T>(path: string, headers?: Record<string, string>): Promise<T> {
   const res = await fetch(
     (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1") + path,
-    { method: "DELETE" }
+    { method: "DELETE", headers }
   );
   if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}`);
   return res.json();
+}
+
+export type OtpChallenge = {
+  challenge_id: string; email_hint: string; expires_in: number; resend_in: number;
+};
+
+/** Error from /otp/* carrying the backend's structured fields. */
+export class OtpApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public attemptsLeft?: number,
+    public resendIn?: number,
+  ) {
+    super(message);
+  }
+}
+
+async function otpPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(
+    (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1") + path,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+  );
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new OtpApiError(
+      typeof j.detail === "string" ? j.detail : `POST ${path} → ${res.status}`,
+      res.status, j.attempts_left, j.resend_in,
+    );
+  }
+  return j as T;
 }
 
 async function patch<T>(path: string, body: unknown): Promise<T> {
@@ -247,7 +278,13 @@ export const api = {
     get<Transaction[]>("/transactions", params),
   transactionsAggregate: (params?: Record<string, string | number | boolean>) =>
     get<TransactionAggregate>("/transactions/aggregate", params),
-  deleteAllTransactions: () => del<{ deleted: number }>("/transactions"),
+  /** Requires a token from verifyOtp(…) for purpose "delete_all_transactions". */
+  deleteAllTransactions: (confirmationToken: string) =>
+    del<{ deleted: number }>("/transactions", { "X-Confirmation-Token": confirmationToken }),
+  requestOtp: (purpose: string) => otpPost<OtpChallenge>("/otp/request", { purpose }),
+  resendOtp:  (challenge_id: string) => otpPost<OtpChallenge>("/otp/resend", { challenge_id }),
+  verifyOtp:  (challenge_id: string, code: string) =>
+    otpPost<{ confirmation_token: string }>("/otp/verify", { challenge_id, code }),
   listCategories: () => get<string[]>("/categories"),
   listCategoryStats: () => get<Array<{ name: string; count: number }>>("/categories/stats"),
   renameCategory: (from_cat: string, to_cat: string) =>

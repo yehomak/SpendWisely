@@ -1,0 +1,17 @@
+# e2e override — same stack, but the backend uses a throwaway DuckDB in a named volume
+# so agentic tests (which delete all transactions) never touch ./db/spendwisely.duckdb.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up --build
+#   ./v2/frontend/tests/seed-e2e.sh        # load the synthetic fixture CSV before each run
+
+services:
+  backend:
+    volumes: !override
+      - ./v2/backend:/app
+      - spendwisely_e2e_db:/data
+    environment:
+      DB_PATH: /data/spendwisely_e2e.duckdb
+
+volumes:
+  spendwisely_e2e_db:

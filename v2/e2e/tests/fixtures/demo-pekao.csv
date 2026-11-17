@@ -1,0 +1,12 @@
+Data księgowania;Data waluty;Nadawca / Odbiorca;Adres nadawcy / odbiorcy;Rachunek źródłowy;Rachunek docelowy;Tytułem;Kwota operacji;Waluta;Numer referencyjny;Typ operacji;Kategoria
+03.09.2026;03.09.2026;DEMO EMPLOYER SP Z O O;;;;Wynagrodzenie wrzesień;8 500,00;PLN;E2E0001;Przelew przychodzący;Wynagrodzenie
+05.09.2026;05.09.2026;BIEDRONKA 1234;Warszawa;;;Zakup kartą;-142,37;PLN;E2E0002;Transakcja kartą;Zakupy spożywcze
+12.09.2026;12.09.2026;DEMO LANDLORD;;;;Czynsz wrzesień;-2 400,00;PLN;E2E0003;Przelew wychodzący;Mieszkanie
+21.09.2026;21.09.2026;COFFEE DEMO;Kraków;;;Zakup kartą;-18,50;PLN;E2E0004;Transakcja kartą;Restauracje
+02.10.2026;02.10.2026;DEMO EMPLOYER SP Z O O;;;;Wynagrodzenie październik;8 500,00;PLN;E2E0005;Przelew przychodzący;Wynagrodzenie
+07.10.2026;07.10.2026;LIDL DEMO;Warszawa;;;Zakup kartą;-98,10;PLN;E2E0006;Transakcja kartą;Zakupy spożywcze
+12.10.2026;12.10.2026;DEMO LANDLORD;;;;Czynsz październik;-2 400,00;PLN;E2E0007;Przelew wychodzący;Mieszkanie
+18.10.2026;18.10.2026;DEMO CINEMA;Warszawa;;;Zakup kartą;-45,00;PLN;E2E0008;Transakcja kartą;Rozrywka
+03.11.2026;03.11.2026;DEMO EMPLOYER SP Z O O;;;;Wynagrodzenie listopad;8 500,00;PLN;E2E0009;Przelew przychodzący;Wynagrodzenie
+06.11.2026;06.11.2026;BIEDRONKA 1234;Warszawa;;;Zakup kartą;-176,04;PLN;E2E0010;Transakcja kartą;Zakupy spożywcze
+12.11.2026;12.11.2026;DEMO LANDLORD;;;;Czynsz listopad;-2 400,00;PLN;E2E0011;Przelew wychodzący;Mieszkanie

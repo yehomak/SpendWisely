@@ -17,8 +17,22 @@ services:
       - ./db:/data                  # persist DuckDB file, accessible from host
     environment:
       DB_PATH: /data/spendwisely.duckdb
+      SMTP_HOST: mailpit            # OTP confirmation e-mails → Mailpit inbox
+      SMTP_PORT: "1025"
     env_file:
       - ./v2/backend/.env          # LLM keys, OWNER_NAME (see .env.example)
+    depends_on:
+      - mailpit
+
+  # Local mail catcher for OTP confirmation codes — inbox UI at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "1025:1025"                # SMTP
+      - "8025:8025"                # web inbox
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
 
   frontend:
     build:

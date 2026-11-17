@@ -1,64 +1,213 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, OtpApiError, type OtpChallenge } from "@/lib/api";
+import { OtpCodeInput } from "@/components/OtpCodeInput";
 
-type Phase = "idle" | "confirm" | "loading";
+const PURPOSE = "delete_all_transactions";
+
+type Phase = "idle" | "confirm" | "requesting" | "code" | "verifying" | "deleting";
 
 export function DeleteAllTransactions() {
   const [phase, setPhase] = useState<Phase>("idle");
+  const [challenge, setChallenge] = useState<OtpChallenge | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /** true when the challenge is dead (locked/expired) and a fresh code is required */
+  const [blocked, setBlocked] = useState(false);
+  const [resendAt, setResendAt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const [resetKey, setResetKey] = useState(0);
   const router = useRouter();
 
-  async function handleDelete() {
-    setPhase("loading");
+  const open = phase !== "idle";
+  const resendIn = Math.max(0, Math.ceil((resendAt - now) / 1000));
+
+  // Tick the "Resend in Ns" countdown while the code step is shown.
+  useEffect(() => {
+    if (!challenge || !open) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [challenge, open]);
+
+  function close() {
+    setPhase("idle");
+    setChallenge(null);
+    setError(null);
+    setBlocked(false);
+  }
+
+  function applyChallenge(ch: OtpChallenge) {
+    setChallenge(ch);
+    setResendAt(Date.now() + ch.resend_in * 1000);
+    setNow(Date.now());
+    setError(null);
+    setBlocked(false);
+    setResetKey((k) => k + 1);
+    setPhase("code");
+  }
+
+  async function requestCode() {
+    setPhase("requesting");
+    setError(null);
     try {
-      await api.deleteAllTransactions();
+      applyChallenge(await api.requestOtp(PURPOSE));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the code");
+      setPhase("confirm");
+    }
+  }
+
+  async function resend() {
+    if (!challenge || resendIn > 0) return;
+    try {
+      applyChallenge(await api.resendOtp(challenge.challenge_id));
+      toast.success("New code sent", { description: `Check ${challenge.email_hint}` });
+    } catch (err) {
+      if (err instanceof OtpApiError && err.resendIn) {
+        setResendAt(Date.now() + err.resendIn * 1000);
+      } else if (err instanceof OtpApiError && err.status === 404) {
+        // challenge gone (expired / finished) — start a fresh one
+        await requestCode();
+      } else {
+        setError(err instanceof Error ? err.message : "Could not resend the code");
+      }
+    }
+  }
+
+  async function submit(code: string) {
+    if (!challenge || phase !== "code" || blocked) return;
+    setPhase("verifying");
+    setError(null);
+    let token: string;
+    try {
+      token = (await api.verifyOtp(challenge.challenge_id, code)).confirmation_token;
+    } catch (err) {
+      if (err instanceof OtpApiError) {
+        if (err.status === 400) {
+          const left = err.attemptsLeft;
+          setError(
+            `Incorrect code${left !== undefined ? ` — ${left} attempt${left === 1 ? "" : "s"} left` : ""}`,
+          );
+        } else {
+          setError(err.message);
+          setBlocked(err.status === 429 || err.status === 410 || err.status === 404);
+        }
+      } else {
+        setError("Could not verify the code");
+      }
+      setResetKey((k) => k + 1);
+      setPhase("code");
+      return;
+    }
+
+    setPhase("deleting");
+    try {
+      const { deleted } = await api.deleteAllTransactions(token);
+      close();
       router.refresh();
-      setPhase("idle");
-      toast.success("All transactions deleted");
+      toast.success("All transactions deleted", {
+        description: `${deleted} transaction${deleted === 1 ? "" : "s"} removed`,
+      });
     } catch (err: unknown) {
       toast.error("Delete failed", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
-      setPhase("idle");
+      close();
     }
   }
+
+  const busy = phase === "requesting" || phase === "verifying" || phase === "deleting";
 
   return (
     <>
       <button
         onClick={() => setPhase("confirm")}
-        disabled={phase === "loading"}
+        disabled={open}
         className="h-8 px-3.5 rounded-lg text-sm font-medium border border-destructive/40 text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors"
       >
-        {phase === "loading" ? "Deleting…" : "Delete all"}
+        {phase === "deleting" ? "Deleting…" : "Delete all"}
       </button>
 
-      {phase === "confirm" && (
+      {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
-            <div>
-              <h2 className="text-sm font-semibold">Delete all transactions?</h2>
-              <p className="text-xs text-muted-foreground mt-1.5">
-                This will permanently delete every transaction and cannot be undone.
-                Category rules will not be affected.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setPhase("idle")}
-                className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="text-xs px-4 py-1.5 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors font-medium"
-              >
-                Delete all
-              </button>
-            </div>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-all-title"
+            className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4"
+          >
+            {phase === "confirm" || phase === "requesting" ? (
+              <>
+                <div>
+                  <h2 id="delete-all-title" className="text-sm font-semibold">Delete all transactions?</h2>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    This will permanently delete every transaction and cannot be undone.
+                    Category rules will not be affected. We&apos;ll e-mail you a confirmation code first.
+                  </p>
+                </div>
+                {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={close}
+                    className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={requestCode}
+                    disabled={busy}
+                    className="text-xs px-4 py-1.5 rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors font-medium"
+                  >
+                    {phase === "requesting" ? "Sending code…" : "Send confirmation code"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h2 id="delete-all-title" className="text-sm font-semibold">Enter confirmation code</h2>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    We sent a 6-digit code to <span className="font-medium text-foreground">{challenge?.email_hint}</span>.
+                    Enter it to delete all transactions.
+                  </p>
+                </div>
+
+                <OtpCodeInput
+                  key={resetKey}
+                  onComplete={submit}
+                  disabled={busy || blocked}
+                  invalid={!!error}
+                />
+
+                <p role="alert" aria-live="assertive" className="text-xs text-destructive text-center min-h-4">
+                  {phase === "verifying" ? "" : error}
+                </p>
+                {phase === "verifying" && (
+                  <p className="text-xs text-muted-foreground text-center -mt-3">Checking…</p>
+                )}
+                {phase === "deleting" && (
+                  <p className="text-xs text-muted-foreground text-center -mt-3">Deleting…</p>
+                )}
+
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    onClick={resend}
+                    disabled={resendIn > 0 || busy}
+                    className="text-xs px-2 py-1.5 rounded-md text-primary hover:underline disabled:no-underline disabled:text-muted-foreground disabled:cursor-not-allowed tabular-nums"
+                  >
+                    {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                  </button>
+                  <button
+                    onClick={close}
+                    disabled={phase === "deleting"}
+                    className="text-xs px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

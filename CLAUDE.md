@@ -13,7 +13,14 @@ cd v2/backend && uvicorn app.main:app --reload   # http://localhost:8000/docs
 cd v2/frontend && npm run dev                    # http://localhost:3000
 
 # Docker dev (hot reload)
-docker compose up --build
+docker compose up --build                        # includes Mailpit: inbox http://localhost:8025
+
+# Backend tests (temp DuckDB, never ./db)
+cd v2/backend && pip install -r requirements-dev.txt && python -m pytest tests
+
+# e2e (agentic) — isolated DB stack, then run from v2/e2e (needs GOOGLE_GENERATIVE_AI_API_KEY)
+docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build
+cd v2/e2e && npx e2e run tests/otp.e2e.ts
 
 # Docker prod
 docker compose -f docker-compose.prod.yml up -d --build
@@ -29,7 +36,9 @@ v2/backend/app/
   services/enricher.py  3-pass categorisation: bank Kategoria → regex → LLM fallback (any provider)
   services/llm.py       Universal LLM provider: ClaudeProvider / OpenAIProvider / GeminiProvider + factory
   services/insights.py  Analytics — excludes is_internal rows (fixes FX double-count)
-  routers/              FastAPI routes: /ingest  /transactions  /insights/*  /categories
+  services/otp.py       OtpStore — random 6-digit codes (hashed), TTL, attempt limit, resend cooldown, single-use confirmation tokens
+  services/mailer.py    SMTP sender (Mailpit in dev)
+  routers/              FastAPI routes: /ingest  /transactions  /insights/*  /categories  /otp
   database.py           DuckDB init + schema (transactions, category_rules tables)
 v2/frontend/
   app/page.tsx          Dashboard (summary, charts, recurring, top merchants)
@@ -41,8 +50,11 @@ v2/frontend/
   components/insights/  MonthlyBreakdownChart, RecurringCostsCard, CategoryDeltasTable (redesigned), TopTransactionsCard, NewMerchantsCard, PeriodSelector
   components/plan/      ThisMonthChecklist — Bills/Daily/One-time sections with paid/total in headers
   components/TransactionsTable.tsx  Client component — search/filter bar, load-more (PAGE=200), aggregate footer
+  components/OtpCodeInput.tsx  6 separate numeric inputs, auto-advance + auto-submit (NOT input-otp — intentional)
   components/ImportReview.tsx  Post-import modal: group table, AI suggest (Haiku), bulk-categorize + rule save
   lib/api.ts            All API calls — single source of truth
+v2/backend/tests/       pytest — conftest points DB_PATH at a temp file
+v2/e2e/                 e2e.dev agentic tests (Gemini); fixtures/demo-pekao.csv is synthetic, seeded in beforeEach
 v1/                     Legacy pipeline — do not extend, reference only
 data/                   Gitignored — personal bank CSV exports
 ```
@@ -85,6 +97,9 @@ data/                   Gitignored — personal bank CSV exports
 - In-app Gmail OAuth is implemented but dormant — needs `GMAIL_CLIENT_ID`/`GMAIL_CLIENT_SECRET` in `.env` and Google Cloud OAuth2 Web credential matching `GMAIL_REDIRECT_URI` (default: `http://localhost:8000/api/v1/gmail/callback`). Override `GMAIL_REDIRECT_URI` in `.env` for Docker/prod deploys. See `routers/gmail.py` docstring.
 - `_recurring_entry()` returns `amount_min` and `amount_max`; RecurringCostsCard shows `min–max` range when `(max-min)/max > 5%`.
 - Insights period selector always writes `?period=X` to URL (never deletes param). Default is `3m`. `period=all` maps to `months=0` which is falsy in JS, so no `months` param is sent → backend returns all data. Careful: `_period(df, 0)` would filter to current month only — `0` must never reach the backend.
+- `DELETE /transactions` requires header `X-Confirmation-Token` from `POST /otp/verify` (purpose `delete_all_transactions`). Flow: `POST /otp/request` → code e-mailed to `OTP_EMAIL_TO` (never in a response) → `/otp/verify` → token (single-use, 5 min). Wrong code → 400 `{detail:"Incorrect code", attempts_left}`; locked → 429; expired → 410. `/otp/resend` issues a new code after `OTP_RESEND_COOLDOWN_SECONDS`.
+- OTP state is in-process memory — fine for the single uvicorn process; would need shared storage for multiple workers.
+- `docker-compose.e2e.yml` swaps `./db` for a named volume (`spendwisely_e2e_db`) — always use it for e2e runs; the OTP test deletes all transactions.
 - `notes/` and `context/private/` are gitignored — safe for personal tax/financial context files.
 - AUTOPAY S.A. pays multiple taxes: ~1,500 PLN PIT ryczałt, ~921 PLN ZUS social (Preferencyjny until Jan 2027). Old ~1,180 tier was superseded Jan 2026. Annual Składka Zdrowotna recalculation (e.g. 2,765 PLN in May 2026) is a one-time annual event, not monthly recurring.
 
@@ -113,6 +128,7 @@ category_rules: id, category, pattern, fields[], priority, comment
 - [x] Fix Gmail redirect URI hardcoding — `GMAIL_REDIRECT_URI` env var; guard refresh_token KeyError
 - [x] Millennium Bank XLSX support, show/hide fix, bank-agnostic empty state, prod docker API_URL (PR #15)
 - [x] Groq default provider, category management modal, regex expansion, import UX + animations (PR #17)
+- [x] OTP e-mail confirmation for "Delete all" (Mailpit, 6-field input, resend countdown) + backend tests + e2e setup
 - [ ] Expand regex rules: BINANCE, personal transfers, SZOPEX
 - [ ] Phase 3: Apple Wallet export parsing endpoint
 - [ ] Phase 3: Manual cash entry UI (quick-add modal)
