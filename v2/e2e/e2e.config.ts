@@ -1,10 +1,11 @@
 import type { E2EConfig } from 'e2e';
 import { web } from '@e2e-dev/web';
-import { google } from '@ai-sdk/google';
+import { groq } from '@ai-sdk/groq';
 
 // Runs against the e2e docker stack (separate DuckDB volume — never ./db):
 //   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up --build
-// Model: Gemini via @ai-sdk/google, reads GOOGLE_GENERATIVE_AI_API_KEY.
+// Model: Groq via @ai-sdk/groq, reads GROQ_API_KEY (export it in your shell —
+// v2/backend/.env is not loaded here). Default model supports tool calls + images.
 export default {
   targets: [{
     engine: web(),
@@ -15,7 +16,7 @@ export default {
   }],
   agents: {
     default: {
-      model: google(process.env.E2E_GEMINI_MODEL ?? 'gemini-flash-latest'),
+      model: groq(process.env.E2E_GROQ_MODEL ?? 'meta-llama/llama-4-maverick-17b-128e-instruct'),
       system: 'You are a thorough QA agent. Verify every outcome on screen.',
     },
   },
