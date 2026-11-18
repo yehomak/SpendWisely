@@ -18,7 +18,7 @@ docker compose up --build                        # includes Mailpit: inbox http:
 # Backend tests (temp DuckDB, never ./db)
 cd v2/backend && pip install -r requirements-dev.txt && python -m pytest tests
 
-# e2e (agentic) — isolated DB stack, then run from v2/e2e (GROQ_API_KEY from shell, else read from v2/.env or v2/backend/.env)
+# e2e (agentic) — isolated DB stack, then run from v2/e2e (GOOGLE_API_KEY from shell, else read from v2/.env or v2/backend/.env)
 docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build
 cd v2/e2e && npx e2e run tests/otp.e2e.ts
 
@@ -54,7 +54,7 @@ v2/frontend/
   components/ImportReview.tsx  Post-import modal: group table, AI suggest (Haiku), bulk-categorize + rule save
   lib/api.ts            All API calls — single source of truth
 v2/backend/tests/       pytest — conftest points DB_PATH at a temp file
-v2/e2e/                 e2e.dev agentic tests (Groq, openai/gpt-oss-120b); fixtures/demo-pekao.csv is synthetic, seeded in beforeEach
+v2/e2e/                 e2e.dev agentic tests (Gemini Flash-Lite, free tier); fixtures/demo-pekao.csv is synthetic, seeded in beforeEach
 v1/                     Legacy pipeline — do not extend, reference only
 data/                   Gitignored — personal bank CSV exports
 ```

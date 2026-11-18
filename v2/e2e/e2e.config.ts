@@ -1,28 +1,36 @@
 import type { E2EConfig } from 'e2e';
 import { web } from '@e2e-dev/web';
-import { createGroq } from '@ai-sdk/groq';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { existsSync, readFileSync } from 'node:fs';
 
-// GROQ_API_KEY: the shell env wins; otherwise take ONLY that key from the app's .env files
-// (v2/.env, then v2/backend/.env) — nothing else from them is loaded.
-function groqApiKey(): string | undefined {
-  if (process.env.GROQ_API_KEY) return process.env.GROQ_API_KEY;
+/**
+ * The first of `names` set in the shell; otherwise that key alone from the app's .env
+ * files (v2/.env, then v2/backend/.env) — nothing else from them is loaded.
+ */
+function apiKey(names: readonly string[]): string | undefined {
+  for (const name of names) if (process.env[name]) return process.env[name];
   for (const rel of ['../.env', '../backend/.env']) {
     const file = new URL(rel, import.meta.url);
     if (!existsSync(file)) continue;
-    const m = readFileSync(file, 'utf8').match(/^\s*(?:export\s+)?GROQ_API_KEY\s*=\s*(.*)$/m);
-    const value = m?.[1].trim().replace(/^(['"])(.*)\1$/, '$2');
-    if (value) return value;
+    const text = readFileSync(file, 'utf8');
+    for (const name of names) {
+      const m = text.match(new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=\\s*(.*)$`, 'm'));
+      const value = m?.[1].trim().replace(/^(['"])(.*)\1$/, '$2');
+      if (value) return value;
+    }
   }
   return undefined;
 }
 
-const groq = createGroq({ apiKey: groqApiKey() });
+const google = createGoogleGenerativeAI({
+  apiKey: apiKey(['GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_API_KEY']),
+});
 
 // Runs against the e2e docker stack (separate DuckDB volume — never ./db):
 //   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up --build
-// Model: Groq (GROQ_API_KEY, see above). Default openai/gpt-oss-120b: tool calls, text-only.
-// Override with E2E_GROQ_MODEL; check access with `npx e2e doctor --check-model`.
+// Model: Gemini Flash-Lite — free tier ~250K tokens/min and ~500 requests/day
+// (Groq's free 8K tokens/min is smaller than one request with the Mailpit page).
+// Override with E2E_GEMINI_MODEL; check access with `npx e2e doctor --check-model`.
 export default {
   targets: [{
     engine: web(),
@@ -33,10 +41,12 @@ export default {
   }],
   agents: {
     default: {
-      model: groq(process.env.E2E_GROQ_MODEL ?? 'openai/gpt-oss-120b'),
+      model: google(process.env.E2E_GEMINI_MODEL ?? 'gemini-flash-lite-latest'),
       system: 'You are a thorough QA agent. Verify every outcome on screen.',
     },
   },
+  // Free-tier model calls are rate limited; the OTP flow needs ~10 of them.
+  timeout: 600_000,
   reporters: ['list', 'markdown'],
   trace: 'on',
 } satisfies E2EConfig;
