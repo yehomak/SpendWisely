@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { api, OtpApiError, type OtpChallenge } from "@/lib/api";
@@ -19,8 +19,18 @@ export function DeleteAllTransactions() {
   const [now, setNow] = useState(() => Date.now());
   const [resetKey, setResetKey] = useState(0);
   const router = useRouter();
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   const open = phase !== "idle";
+
+  // Native modal <dialog>: showModal() makes the page behind it inert (focus trap,
+  // hidden from assistive tech and test agents) and gives Esc-to-cancel for free.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    else if (!open && dialog.open) dialog.close();
+  }, [open]);
   const resendIn = Math.max(0, Math.ceil((resendAt - now) / 1000));
 
   // Tick the "Resend in Ns" countdown while the code step is shown.
@@ -129,14 +139,17 @@ export function DeleteAllTransactions() {
         {phase === "deleting" ? "Deleting…" : "Delete all"}
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-all-title"
-            className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4"
-          >
+      <dialog
+        ref={dialogRef}
+        aria-labelledby="delete-all-title"
+        onCancel={(e) => {
+          e.preventDefault();
+          if (phase !== "deleting") close();
+        }}
+        className="m-auto bg-background text-foreground border border-border rounded-xl shadow-2xl w-[calc(100%-2rem)] max-w-sm p-0 backdrop:bg-black/50"
+      >
+        {open && (
+          <div className="p-6 flex flex-col gap-4">
             {phase === "confirm" || phase === "requesting" ? (
               <>
                 <div>
@@ -168,7 +181,7 @@ export function DeleteAllTransactions() {
                 <div>
                   <h2 id="delete-all-title" className="text-sm font-semibold">Enter confirmation code</h2>
                   <p className="text-xs text-muted-foreground mt-1.5">
-                    We sent a 6-digit code to <span className="font-medium text-foreground">{challenge?.email_hint}</span>.
+                    We sent a six-digit code to <span className="font-medium text-foreground">{challenge?.email_hint}</span>.
                     Enter it to delete all transactions.
                   </p>
                 </div>
@@ -209,8 +222,8 @@ export function DeleteAllTransactions() {
               </>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </dialog>
     </>
   );
 }

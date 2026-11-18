@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 
 const LENGTH = 6;
+// Ordinal words instead of "Digit 1 of 6": a bare number in an accessible name is
+// read as on-screen data by agentic test tools (it can mark a typed digit as copied).
+const ORDINALS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth"];
 
 type Props = {
   /** Called once all 6 digits are filled (auto-submit). */
@@ -91,7 +94,7 @@ export function OtpCodeInput({ onComplete, disabled, invalid }: Props) {
           pattern="[0-9]*"
           maxLength={1}
           autoComplete="one-time-code"
-          aria-label={`Digit ${i + 1} of ${LENGTH}`}
+          aria-label={`${ORDINALS[i]} digit`}
           aria-invalid={invalid || undefined}
           value={d}
           disabled={disabled}
