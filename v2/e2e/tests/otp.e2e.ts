@@ -19,16 +19,19 @@ describe('delete all transactions', () => {
   test('confirms delete all with an emailed code', async ({ app, agent, screen, browser }) => {
     await app.open('/');
 
-    // A blank second tab for the mail inbox — the agent can switch tabs and navigate,
-    // but has no "open a new tab" action of its own.
+    // The mail inbox in tab 2, opened up front: the agent can switch tabs but has no
+    // "open a new tab" action, and navigating tab 1 away would close the dialog.
     const appTab = browser.tabs()[0];
     await browser.newTab();
+    await browser.goto(MAILPIT);
     await appTab.activate();
 
     await agent.act('start deleting all transactions and request a confirmation code');
+    await expect(screen.getByRole('heading', 'Enter confirmation code')).toBeVisible();
+
     await agent.act(
-      `open the Mailpit inbox at ${MAILPIT} in tab 2, read the newest confirmation code, ` +
-        'switch back to tab 1 and enter it',
+      'switch to tab 2 with the Mailpit inbox, read the code in the newest e-mail, ' +
+        'switch back to tab 1 and type the code one digit into each of the six boxes',
     );
 
     await expect(screen.getByText('All transactions deleted')).toBeVisible();
