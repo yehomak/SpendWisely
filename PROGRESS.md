@@ -166,6 +166,12 @@
 - **Import review UX**: bouncing dots on Import + Suggest buttons; progress bar animates from 0 on modal open and grows live; Suggest button shows live coverage %; `+X% from review` emerald delta
 - **Success animation**: SVG checkmark with circle-draw (0.65s) + tick-draw (0.35s after 0.6s delay); success state enters with `fade-in zoom-in-95`; if final coverage ≥ 80% modal fades out + scales down and navigates to `/` after 2.5s
 
+### feature/otp-confirmation — OTP e-mail confirmation for "Delete all"
+- **Backend**: `services/otp.py` (`OtpStore`: `secrets` 6-digit codes stored as SHA-256, 10 min TTL, 5 attempts, 30 s resend cooldown, single-use purpose-bound tokens); `services/mailer.py` (SMTP); `routers/otp.py` (`/otp/request`, `/otp/resend`, `/otp/verify`); `DELETE /transactions` now requires `X-Confirmation-Token`
+- **Frontend**: `OtpCodeInput.tsx` (6 separate `inputMode=numeric maxLength=1 autoComplete=one-time-code` fields, auto-advance, backspace/arrow nav, paste spreading, auto-submit); `DeleteAllTransactions.tsx` flow confirm → send code → enter code with "Incorrect code — N attempts left" and "Resend in Ns" countdown
+- **Docker**: Mailpit service (SMTP 1025, inbox 8025); `docker-compose.e2e.yml` with isolated DB volume
+- **Tests**: `v2/backend/tests/test_otp.py` (20 tests: generation, TTL, attempt limit, resend, HTTP flow); `v2/e2e/tests/otp.e2e.ts` agentic test (Gemini Flash-Lite) reading the code from Mailpit in a second tab
+
 ## In Progress / Pending
 - **Regex rules gap**: BINANCE (crypto), personal transfers, SZOPEX (shoes) — still uncategorized
 - **Dead code to clean**: `regularityColor` in RecurringCostsCard (unused), `MonthlyBreakdownTable` component (unused), `barColor.replace()` string hack in CategoryDeltasTable
